@@ -2,6 +2,7 @@
 const express = require("express");
 const bodyParser = require("body-parser");
 const mongoose = require("mongoose");
+const _ = require("lodash");
 
 const app = express();
 
@@ -37,9 +38,7 @@ app.get("/", function (req, res) {
   Item.find({}, function (err, results) {
     if (results.length === 0) {
       Item.insertMany(defaultItems, function (err) {
-        if (err) {
-          console.log(err);
-        } else {
+        if (!err) {
           console.log("Successfully saved default items to DB");
         }
       });
@@ -51,7 +50,7 @@ app.get("/", function (req, res) {
 });
 
 app.get("/:customListName", function (req, res) {
-  const customListName = req.params.customListName;
+  const customListName = _.capitalize(req.params.customListName);
   List.findOne({ name: customListName }, function (err, result) {
     if (!err) {
       if (!result) {
@@ -93,12 +92,26 @@ app.post("/", function (req, res) {
 
 app.post("/delete", function (req, res) {
   const checkedItemId = req.body.checkbox;
-  Item.findByIdAndRemove(checkedItemId, function (err) {
-    if (!err) {
-      console.log("Successfuly removed the item");
-      res.redirect("/");
-    }
-  });
+  const listName = req.body.listName;
+
+  if (listName === "Today") {
+    Item.findByIdAndRemove(checkedItemId, function (err) {
+      if (!err) {
+        console.log("Successfuly removed the item");
+        res.redirect("/");
+      }
+    });
+  } else {
+    List.findOneAndUpdate(
+      { name: listName },
+      { $pull: { items: { _id: checkedItemId } } },
+      function (err, result) {
+        if (!err) {
+          res.redirect("/" + listName);
+        }
+      }
+    );
+  }
 });
 
 app.listen(process.env.PORT || 3000, function () {
